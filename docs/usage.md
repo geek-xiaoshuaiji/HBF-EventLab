@@ -189,6 +189,22 @@ CLI的 `HOST` 行同时报告命令尝试和逻辑工作结果。计数单位如
 
 例如64条timeout响应可能对应一轮整页重发；发生尝试错误的Global条目仍可能最终成功。三类重发命令计数按本次重发原因分类；replay中的资源重试也属于 `replay_commands`，因此不能将它与上述重试计数相加当作互斥总数。实验比较应同时保存配置、尝试错误、逻辑结果与排空状态。
 
+## Live GPU模型镜像环境变量
+
+Accel-Sim/GPGPU-Sim在线后端使用以下环境变量；完整接入和构建命令见[GPU/HBF integration](gpu_integration.md)：
+
+| 变量 | 默认值 | 含义 |
+|---|---:|---|
+| `HBF_EVENTLAB_IMAGE_PAGES` | 0 | 选择从逻辑页0开始的连续符号镜像页数。 |
+| `HBF_EVENTLAB_IMAGE_PAGE_FILE` | 未设置 | 增加稀疏逻辑页；每行十进制或`0x`页号，允许空行和`#`注释，重复页去重。 |
+| `HBF_EVENTLAB_PRELOAD_IMAGE` | 0 | 为1时在GPU计时前通过完整Host/Device/NAND写路径编程镜像并排空。 |
+| `HBF_EVENTLAB_SEED_IMAGE` | 0 | 为1时把镜像建成测量前已存在的符号NAND状态，不计运行期erase/program；与`PRELOAD_IMAGE`互斥。GPU读取路径不变。 |
+| `HBF_EVENTLAB_PAGES_PER_CHANNEL` | 4096 | 稀疏驻留页预算。 |
+| `HBF_EVENTLAB_TRACE` | 未设置 | 逐GPU请求输出`INGRESS/COMPLETED/RETURNED`生命周期CSV。 |
+| `HBF_EVENTLAB_FAIL_ONCE` | 0 | 为1时注入一次可复用program失败。 |
+
+镜像页必须落在配置的HBF容量内。seed模式用于权重在测量开始前已经部署的完整模型回放；需要研究写入时序、写放大或恢复时应使用preload模式。两者都只保存符号内容身份，不保存真实模型字节。
+
 ## 运行器与参数
 
 | 参数 | 默认值 | 来源性质 |

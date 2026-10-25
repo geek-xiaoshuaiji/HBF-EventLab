@@ -14,6 +14,7 @@ The project supports research into **Host–HBF coordination, access organizatio
 | Area | Implemented Capabilities |
 |---|---|
 | Host and input | Global byte-address interleaving, splitting requests into 64B commands, filling DLUs across Global entries, and bounded request sending and data retention storage. |
+| GPU request path | Trace-driven GPU requests plus an optional live Accel-Sim/GPGPU-Sim adapter. Live `mem_fetch` requests support 32B sectors/128B masks, page merging, strict full-page writes, final completion fan-out, replay feedback, and joint GPU/Host/Device draining. See [GPU Integration](docs/gpu_integration.md). |
 | Write path | 4KiB DLU assembly, duplicate fragment detection, assembly timeouts, acceptance and program ordering, and automatic erase at the start of a write sequence; full 4KiB local write bursts can be explicitly enabled. |
 | Read path | 64B reads, Pending forwarding and missing-fragment responses, ordering groups for ordinary reads, Regular/Batch windows, and Bank Cache. |
 | Resources and events | Bank execution occupancy, a two-page Cache per Bank, finite receive/return buffers, UCIe transfers, targeted backpressure wakeups, and causal progression within the same Tick. |
@@ -23,7 +24,7 @@ The project supports research into **Host–HBF coordination, access organizatio
 
 The media model uses `DataToken` to represent symbolic content. It does not store actual user bytes or NAND cell charge. Core Channel currently uses an ideal model with infinite bandwidth and zero latency; the fixed NAND latencies and buffer parameters cannot be used directly to predict real product performance.
 
-Read bursts, full AXI/CSR/ADMIN, ECC, a temperature subsystem, and a complete GPU–HBM–HBF path are currently unsupported. Inputs such as explicitly ordered reads accessing Pending DLUs and additional completion dependencies for WRITE requests also have specific restrictions. See [Scope and Limitations](docs/scope_and_limitations.md) for details.
+Read bursts, full AXI/CSR/ADMIN, ECC, a temperature subsystem, GPU atomics, and a coherent combined GPU–HBM–HBF hierarchy are currently unsupported. The live adapter covers the simulated GPU Core memory-request path to EventLab, while functional payload bytes remain owned by GPGPU-Sim. See [Scope and Limitations](docs/scope_and_limitations.md) for details.
 
 ## Quick Start
 
@@ -93,6 +94,9 @@ On both platforms, the normal read/write and single-failure recovery workloads a
 The first line of a workload must be `HBF_EVENTLAB_WORKLOAD 1`, and request addresses must use **Global byte addresses**. File order does not imply that the previous request has completed. See the [Input Format](docs/usage.md#有限-workload-格式-v1) for the meanings of dependencies, content identity, and group ordering. Start with the [Normal Read/Write Example](examples/workloads/normal.txt) and the [Recovery Example](examples/workloads/recovery.txt).
 
 - `hbf_eventlab_cli`: the main entry point for Global workloads and the Host–Device feedback loop.
+- `hbf_eventlab_gpu_cli`: a trace-driven GPU memory-request front end with finite issue/MSHR feedback; see [GPU Integration](docs/gpu_integration.md).
+- `scripts/build_accel_sim_eventlab.sh`: applies the pinned live-backend patch to a separate HBF-Sim checkout and builds the simulated CUDA runtime.
+- `scripts/smoke_accel_sim_eventlab.sh`: compiles and runs CUDA kernels that verify the live GPU Core/EventLab request-completion loop.
 - `hbf_eventlab_device_demo`: a standalone example driven by Device transactions.
 - `hbf_eventlab_demo`: a functional example that explicitly operates low-level components.
 

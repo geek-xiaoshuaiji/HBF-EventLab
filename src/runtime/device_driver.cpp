@@ -12,6 +12,13 @@ bool DeviceActivity::drained() const {
         bank_operations || waiting_erases || window_reads || queued_reads || egress || in_flight_responses || feedback_events ||
         protected_cache_slots || filling_cache_slots || scheduled_driver_events || queued_wakeups);
 }
+void DeviceDriver::seed_page(ChannelAddress address,const PageData& data) {
+    if(address.local.value%dlu_bytes)throw std::invalid_argument("initial image needs page base");
+    if(stats_.handoffs||!activity().drained())throw std::logic_error("initial image requires unused drained Device");
+    const auto media=zones_.translate(address);
+    const auto slot=layout_.decode(media);
+    media_.program(replacements_.translate(slot),data);
+}
 DeviceDriver::DeviceDriver(StaticDeviceDescription d,ExecutionConfiguration c,EventQueue& e,
         std::unique_ptr<INandSchedulingPolicy> nand,std::unique_ptr<IUcieArbitrationPolicy> link,
         std::unique_ptr<IReadDispatchPolicy> dispatch)

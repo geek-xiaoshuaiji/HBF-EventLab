@@ -58,6 +58,9 @@ public:
     const DeviceRuntimeState& resources() const { return runtime_; }
     DeviceActivity activity() const;
     const DeviceStatistics& statistics() const { return stats_; }
+    // Establish a pre-existing symbolic NAND image before the first handoff.
+    // This changes functional media state only: no runtime timing or statistics.
+    void seed_page(ChannelAddress,const PageData&);
     // Fault input and optional streaming diagnostics; no unbounded history in Device.
     void set_program_outcome(std::function<ProgramOutcome(const ProgramOperation&)> f) { outcome_=std::move(f); }
     void set_trace(std::function<void(const DeviceTrace&)> f) { trace_=std::move(f); }

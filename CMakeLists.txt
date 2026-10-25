@@ -6,6 +6,8 @@ add_library(hbf_eventlab
     src/host/recovery_manager.cpp
     src/host/host_driver.cpp
     src/host/write_retry.cpp
+    src/gpu/gpu_issue_gate.cpp
+    src/gpu/page_controller.cpp
     src/runtime/simulation_runner.cpp
     src/architecture/execution_configuration.cpp
     src/runtime/bank_cache.cpp
@@ -28,6 +30,7 @@ add_library(hbf_eventlab
 )
 add_library(HBFEventLab::core ALIAS hbf_eventlab)
 target_include_directories(hbf_eventlab PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(hbf_eventlab PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hbf_sim)
 target_compile_features(hbf_eventlab PUBLIC cxx_std_17)
 set_target_properties(hbf_eventlab PROPERTIES CXX_EXTENSIONS OFF)
 if(MSVC)
@@ -37,14 +40,48 @@ else()
 endif()
 add_library(hbf_eventlab_workload_io src/adapters/workload_reader.cpp)
 target_link_libraries(hbf_eventlab_workload_io PUBLIC HBFEventLab::core)
+add_library(hbf_eventlab_gpu_io src/adapters/gpu_trace_reader.cpp)
+target_link_libraries(hbf_eventlab_gpu_io PUBLIC HBFEventLab::core)
 add_executable(hbf_eventlab_demo examples/foundations_demo.cpp)
 target_link_libraries(hbf_eventlab_demo PRIVATE HBFEventLab::core)
 add_executable(hbf_eventlab_device_demo examples/device_loop_demo.cpp)
 target_link_libraries(hbf_eventlab_device_demo PRIVATE HBFEventLab::core)
 add_executable(hbf_eventlab_cli examples/minimal_loop.cpp)
 target_link_libraries(hbf_eventlab_cli PRIVATE hbf_eventlab_workload_io)
+add_executable(hbf_eventlab_gpu_cli examples/gpu_loop.cpp)
+target_link_libraries(hbf_eventlab_gpu_cli PRIVATE hbf_eventlab_gpu_io)
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(hbf_eventlab_gpu_page_tests tests/gpu_pages.cpp)
+    target_link_libraries(hbf_eventlab_gpu_page_tests PRIVATE HBFEventLab::core)
+    foreach(scenario merge write_coverage partial feedback multichannel recovery issue_width streaming sector_mask external_clock)
+        add_test(NAME gpu_pages_${scenario} COMMAND hbf_eventlab_gpu_page_tests ${scenario})
+        set_tests_properties(gpu_pages_${scenario} PROPERTIES TIMEOUT 30)
+    endforeach()
+    add_executable(hbf_eventlab_gpu_tests tests/gpu.cpp)
+    target_link_libraries(hbf_eventlab_gpu_tests PRIVATE hbf_eventlab_gpu_io)
+    foreach(scenario parser issue_window closed_loop)
+        add_test(NAME gpu_${scenario} COMMAND hbf_eventlab_gpu_tests ${scenario})
+        set_tests_properties(gpu_${scenario} PROPERTIES TIMEOUT 30)
+    endforeach()
+    add_test(NAME gpu_cli_basic COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:hbf_eventlab_gpu_cli>"
+        "-DWORKLOAD=${CMAKE_CURRENT_SOURCE_DIR}/examples/gpu_traces/basic.txt"
+        "-DEXPECTED=0" "-DEXPECT_TEXT=GPU issued=6 completed=6"
+        "-DARGS=--gpu-cycle-ps;500;--issue-limit;2;--mshrs;1;--channels;1"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_cli.cmake")
+    set_tests_properties(gpu_cli_basic PROPERTIES TIMEOUT 30)
+    function(gpu_cli_case name input expected text)
+        add_test(NAME gpu_cli_${name} COMMAND ${CMAKE_COMMAND}
+            "-DPROGRAM=$<TARGET_FILE:hbf_eventlab_gpu_cli>"
+            "-DWORKLOAD=${CMAKE_CURRENT_SOURCE_DIR}/examples/gpu_traces/${input}.txt"
+            "-DEXPECTED=${expected}" "-DEXPECT_TEXT=${text}" "-DARGS=${ARGN}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_cli.cmake")
+        set_tests_properties(gpu_cli_${name} PROPERTIES TIMEOUT 30)
+    endfunction()
+    gpu_cli_case(merge32 merge32 0 "mshr_hits=31 page_reads=1" --issue-width 8 --channels 2)
+    gpu_cli_case(recovery merge32 0 "replay_passes=1 logical_failed=0" --issue-width 8 --channels 2 --fail-page 0)
+    gpu_cli_case(incomplete incomplete 2 "incomplete_writes=1" --write-deadline 100)
     add_executable(hbf_eventlab_host_retry_tests tests/host_retry.cpp)
     target_link_libraries(hbf_eventlab_host_retry_tests PRIVATE HBFEventLab::core)
     foreach(scenario pending_root_first pending_follower_first pending_late_followers pending_exhausted
@@ -80,7 +117,7 @@ if(BUILD_TESTING)
     add_test(NAME device_demo COMMAND hbf_eventlab_device_demo)
     add_executable(hbf_eventlab_device_tests tests/device.cpp)
     target_link_libraries(hbf_eventlab_device_tests PRIVATE HBFEventLab::core)
-    foreach(scenario auto_write_read split_write bank_parallel bank_serial mocs_ingress rx_reservation
+    foreach(scenario auto_write_read seed_image split_write bank_parallel bank_serial mocs_ingress rx_reservation
             window_batch_timer window_threshold window_channel_isolation batch_pending batch_missing cache_hit
             miss_becomes_hit ordered_pages ordered_error pending_order_diagnostic tx_cache_pressure cache_rewrite
             pending_frozen pending_tx_full rejected_batch_no_effect ingress_bypass fault_fanout replacement_replay

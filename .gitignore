@@ -2,6 +2,7 @@
 /build*/
 /.vs/
 /out/
+/research/
 *.user
 
 # 默认忽略日志

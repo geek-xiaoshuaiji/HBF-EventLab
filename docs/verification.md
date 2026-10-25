@@ -6,16 +6,22 @@
 
 ## 1. 验证版本与环境
 
-下列结果对应项目版本 **0.5.0**，共 **187 项**；回归日期为 **2026-10-10**。测试覆盖当前支持的功能子集，目标环境的复现命令见第 3、4 节。
+下列结果对应GPU开发分支，项目版本 **0.5.0**，共 **204 项**；回归日期为 **2026-10-13**。其中187项来自原EventLab基线，17项覆盖GPU前端和在线接入所需的公共接口。测试覆盖当前支持的功能子集，目标环境的复现命令见第3、4节。
 
 | 配置 | 测试结果 | CTest墙钟耗时 |
 |---|---|---:|
-| Debug | 187/187通过，0失败 | 41.66s |
-| Release | 187/187通过，0失败 | 29.17s |
+| Debug | 204/204通过，0失败 | 83.20s |
+| Release | 204/204通过，0失败 | 6.55s |
 
-上述 CTest 使用 4 个并行作业。墙钟耗时包含测试进程和测试框架开销，并受机器、工具链、并发和系统负载影响；不构成 Debug/Release 或跨平台性能结论。项目要求 C++17 和 CMake 3.20 或更新版本，平台构建方法见[使用说明](usage.md#构建)；复现时应记录 commit、工具链及配置。
+上述最新CTest使用2个并行作业。墙钟耗时包含测试进程和测试框架开销，并受机器、工具链、并发和系统负载影响；不构成Debug/Release或跨平台性能结论。项目要求C++17和CMake 3.20或更新版本，平台构建方法见[使用说明](usage.md#构建)；复现时应记录commit、工具链及配置。
 
 ## 2. 测试矩阵
+
+GPU开发分支新增验证（2026-10-13）：node2 / Ubuntu 22.04.5 / GCC 11.4，Release与Debug均204/204通过。Release 6.55 s、Debug 83.20 s，均2并发；17项为GPU专项，其余187项为原回归。live Accel-Sim/EventLab另运行7组CUDA kernel，结果标签为`node2-03`；原版HBF-Sim和live接入版证据分别记录在[引入记录](hbf_sim_import.md)。
+
+live验收逐请求检查`INGRESS → COMPLETED → RETURNED`，拒绝重复、缺失、顺序倒置或source/payload变化。1/2/4 Channel用例均4/4守恒；同页合并用例32/32守恒且只有1次sense；慢sense将GPU cycle从5710提高到5950。完整页用例跨两个GPU kernel完成128个32B写和128个32B读，Device为每阶段各执行1个页操作，1024个32位值校验通过。program故障用例发生64条command错误和1遍replay，32个GPU请求最终全部成功并排空。
+
+模型级smoke使用已校验Qwen3-1.7B完整解码trace中的BF16向量乘法kernel 3834。一个高地址稀疏权重页经完整EventLab写路径预加载后，模拟GPU执行26861 cycles、11776条指令和2个CTA；128个32B HBF请求全部`INGRESS/COMPLETED/RETURNED`，形成127次MSHR hit、1个backend页读和1次NAND sense，最终GPU/Host/Device排空。该结果只验证真实模型单kernel闭环，不代表完整1819-kernel decode已完成。
 
 187项由35个基础行为场景、34个生命周期/事件场景、44个Device场景、1个Device示例、65个Host行为场景和8个CLI场景组成。分类表示验证职责，不表示规范章节数量。
 

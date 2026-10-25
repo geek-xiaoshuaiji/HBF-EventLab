@@ -183,3 +183,11 @@ Runner只查询各所有者摘要。有未来timeout、窗口或完成事件就�
 低层组件测试可以显式构造路径与有界结果替身；正式闭环由Device安排完成，Host不得直接调用finish或response_delivered来代替反馈。回调异步执行，析构仅用于关闭模拟实例，不是运行时撤回已开始NAND操作的协议。
 
 容量协调器提交前检查排空、数据可丢弃、健康资源与密度，准备候选后同步失效，再一致提交。失效回调不可重入修改或获取新pin；异常保留旧映射与quiesce，已经发生的物理损坏不回滚。附着的映射组件不能绕过协调器修改。
+
+## 11. GPU 页请求前端
+
+`GpuPageController` 按源 FIFO 和 GPU 周期发射请求，维护有限 outstanding、页 MSHR 与严格写覆盖。同页读合并为一个 Global 页事务；写收齐后才交给 `HostDriver::enqueue`。Host 完整沿用命令拆分、retention、重试和 replay，并通过异步 observer 交付最终结果；GPU 再按原始 ID 和 source 分发完成。Runner 的 source probes 将 GPU 队列、缓冲、MSHR 和自有事件纳入排空/成功判断。对应实现及与独立原版 HBF-Sim 的区别见 [GPU 接入](gpu_integration.md) 与 [引入记录](hbf_sim_import.md)。
+
+`integration/accel_sim/hbf_eventlab_bridge` 是 C++11 安全的 PIMPL 边界，内部以 C++17 链接 EventLab。它在 `hbf_system_t` seam 接收 GPU Core 在线产生的 `mem_fetch`，保留原 source partition 和对象所有权；32B sector/128B mask 转为页覆盖，最终成功后同一对象进入按 source 的返回队列。总owned数维持GPU背压，直到memory partition真正取回完成。
+
+GPU DRAM domain每次调用 `cycle_at`，桥接层把秒转换为EventLab的1ps Tick，并使用 `EventQueue::run_until`只执行不晚于当前GPU时间的事件。未来Device完成不能提前释放GPU请求；跨kernel时钟重置只允许在GPU、Host和Device均排空后建立新epoch。初始页通过显式写事务进入NAND，未写页不会被伪装为成功读取。

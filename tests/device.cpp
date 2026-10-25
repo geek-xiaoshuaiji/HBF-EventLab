@@ -78,6 +78,15 @@ void auto_write_read() {
     check(f.device.statistics().programs==1&&f.device.statistics().erases==1&&f.device.statistics().senses==1,"all media driven by Device");
     check(f.device.cache().contains({0,0,0,0,0,0}),"persistent cache survives drain");
 }
+void seed_image() {
+    Fixture f;PageData data;data.fill(DataToken{77});
+    f.device.seed_page({0,LocalByteAddress{0}},data);
+    const auto r=f.send(f.tx(Op::Read));f.run();
+    check(f.rr(r).status==ReadStatus::Success&&f.rr(r).data==DataToken{77},"seeded NAND page is readable");
+    check(f.device.statistics().programs==0&&f.device.statistics().erases==0&&f.device.statistics().senses==1,
+          "initial image has no runtime program or erase");
+    rejects<std::logic_error>([&]{f.device.seed_page({0,LocalByteAddress{4096}},data);});
+}
 void split_write() {
     Fixture f;
     for(std::uint32_t slot=0;slot<64;++slot) f.send(f.tx(Op::Write,{0,0,0,0},0,slot,64,slot+9));
@@ -450,7 +459,7 @@ int main(int argc,char**argv) {
         {"ordered_late_error",ordered_late_error},{"rewrite_saved_read",rewrite_saved_read},
         {"retirement_loop",retirement_loop},{"teardown_cache_hit",teardown_cache_hit},
         {"callback_limit",callback_limit},{"multi_channel_bandwidth",multi_channel_bandwidth},
-        {"auto_write_read",auto_write_read},{"split_write",split_write},{"bank_parallel",bank_parallel},{"bank_serial",bank_serial},
+        {"auto_write_read",auto_write_read},{"seed_image",seed_image},{"split_write",split_write},{"bank_parallel",bank_parallel},{"bank_serial",bank_serial},
         {"mocs_ingress",mocs_ingress},{"rx_reservation",rx_reservation},{"window_batch_timer",window_batch_timer},
         {"window_threshold",window_threshold},{"window_channel_isolation",window_channel_isolation},
         {"batch_pending",batch_pending},{"batch_missing",batch_missing},{"cache_hit",cache_hit},{"miss_becomes_hit",miss_becomes_hit},

@@ -26,6 +26,8 @@ public:
     // Callback exceptions retain the remaining batch; resumption finishes it first.
     bool run_next();
     void run();
+    // External simulators may advance time without executing future events.
+    void run_until(Tick horizon);
     void set_limits(EventLimits limits) { limits_ = limits; }
     Tick now() const { return now_; }
     std::uint64_t round() const { return round_; }

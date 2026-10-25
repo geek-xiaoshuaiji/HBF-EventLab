@@ -3,6 +3,7 @@
 #include "hbf_eventlab/host/retention_store.hpp"
 #include "hbf_eventlab/host/recovery_manager.hpp"
 #include "hbf_eventlab/policies/host_send_policy.hpp"
+#include "hbf_eventlab/interfaces/global_request_gate.hpp"
 #include <bitset>
 #include <memory>
 namespace hbf_eventlab {
@@ -24,12 +25,17 @@ struct HostTrace {
 class HostDriver {
 public:
     HostDriver(IHostPort&,EventQueue&,const IHostInterleaver&,HostConfiguration={},
-               std::unique_ptr<IHostSendPolicy> = std::make_unique<FillOpenDluPolicy>());
+               std::unique_ptr<IHostSendPolicy> = std::make_unique<FillOpenDluPolicy>(),
+               std::shared_ptr<IGlobalRequestGate> = {});
     ~HostDriver();
     HostDriver(const HostDriver&)=delete;
     HostDriver& operator=(const HostDriver&)=delete;
     void load(const std::vector<GlobalRequest>&); // fully validate before start/any transmission
     void start();
+    // Streaming producers own their dependency ordering. Requests enter only
+    // when issued; replay and all device commands remain owned by this Host.
+    void enqueue(const GlobalRequest&);
+    void set_completion_observer(std::function<void(const WorkResult&,Tick)> f) { completion_=std::move(f); }
     HostActivity activity() const;
     const std::map<GlobalRequestId,WorkResult>& results() const {return results_;}
     const HostStatistics& statistics() const {return stats_;}
@@ -101,6 +107,7 @@ private:
     void make_replay(ContentKey,RecoveryTask&);
     void abort_version(ContentKey,const std::string&);
     bool retry_eligible(const Unit&) const;
+    std::vector<GlobalRequestId> unissued_parents(const Unit&) const;
     void note_write_retry(Unit&,const WriteResponse&);
     bool advance_write_retries();
     void requeue(Unit&);
@@ -115,6 +122,7 @@ private:
     GlobalRequestSplitter splitter_;
     HostConfiguration config_;
     std::unique_ptr<IHostSendPolicy> policy_;
+    std::shared_ptr<IGlobalRequestGate> gate_;
     WriteRetentionStore retention_;
     RecoveryManager recovery_;
     std::vector<Channel> channels_;
@@ -125,6 +133,7 @@ private:
     std::map<ContentKey,Version> versions_;
     std::map<LogicalBlockKey,std::vector<ContentKey>> version_order_;
     std::map<CommandId,Attempt> attempts_;
+    std::set<GlobalRequestId> issued_globals_;
     std::map<LogicalBlockKey,std::set<CommandId>> unsettled_;
     std::set<EventId> owned_events_;
     std::map<Tick,EventId> release_events_;
@@ -137,6 +146,7 @@ private:
     bool loaded_=false,started_=false;
     HostStatistics stats_;
     std::function<void(const HostTrace&)> trace_;
+    std::function<void(const WorkResult&,Tick)> completion_;
 };
 } // namespace hbf_eventlab
 

@@ -6,6 +6,10 @@
 
 规范基准为 [OCP HBF Architecture Specification v0.7.0（03 AUG 2026）](https://www.opencompute.org/documents/ocp-hbf-architecture-specification-v0-7-0-final-pdf)，主要对照第 4、5、11 章。规范关系和项目选择必须分开记录；实现一个接口不等于证明任意替代实现都符合规范。
 
+## GPU 分支新增解释
+
+GPU 页合并、严格写覆盖、source FIFO 和周期发射为前端模型选择，不改变原 OCP Device 语义。固定 HBF-Sim 来源、streaming Host 与异步完成的所有权、页事务到64B command的保守转换，以及验证范围见 [GPU 接入](gpu_integration.md) 和 [引入记录](hbf_sim_import.md)。外部source probes使Completed要求GPU、Host、Device共同排空。live adapter已把GPU Core在线产生的`mem_fetch`接入EventLab并返回原source partition；它使用符号数据和简化稀疏几何，不声称复制原版FTL/cache或校准真实硬件。
+
 ## 1. 阅读方法与证据边界
 
 每条决策使用 **规范关系** 和 **条目性质** 两个维度。分类对象是具体规则、机制或假设；“分类边界说明”用于区分一条记录中不同内容的依据。
@@ -2992,6 +2996,10 @@
 | 已知限制 | 只支持有限内存加载输入；未实现GPU/HBM、运行时CSR/ADMIN、自动refresh或remap workload。 |
 
 ## 5. 参数与模型假设
+
+### GPU模型镜像初始化边界
+
+live GPU后端明确区分两类实验：`PRELOAD_IMAGE`通过完整Host/Device/NAND写路径建立镜像，适合验证写入与恢复；`SEED_IMAGE`只在Device尚未接收任何handoff时建立预存在的符号NAND内容，适合把模型部署排除在decode测量区间之外。seed不增加运行期erase/program计数，不填充Bank Cache，也不改变后续读路径；GPU读取仍需经过Device调度、sense和completion反馈。两种模式互斥，不能用seed结果声称验证了镜像写入性能或恢复行为。
 
 当前默认配置、单位与CLI/API入口统一记录在[使用说明](usage.md#运行器与参数)。具体选择理由保留在各ADR中，尤其是[功能时延](#adr-loop-m01)、[容量与几何](#adr-loop-m02)、[链路计费](#adr-loop-l04)、[replay预算](#adr-loop-h15)和[资源重试预算](#adr-loop-h25)。
 

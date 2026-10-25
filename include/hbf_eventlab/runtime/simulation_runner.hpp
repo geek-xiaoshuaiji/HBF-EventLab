@@ -24,11 +24,17 @@ public:
     SimulationRunner(EventQueue& e,HostDriver& h,std::function<DeviceActivity()> d)
         :events_(e),host_(h),device_(std::move(d)) {}
     RunReport run(RunLimits={});
+    void set_source_probes(std::function<bool()> drained,std::function<bool()> success,
+                           std::function<std::string()> reason) {
+        source_drained_=std::move(drained);source_success_=std::move(success);source_reason_=std::move(reason);
+    }
 private:
     RunReport report(RunStatus,const std::string&);
     EventQueue& events_;
     HostDriver& host_;
     std::function<DeviceActivity()> device_;
+    std::function<bool()> source_drained_,source_success_;
+    std::function<std::string()> source_reason_;
 };
 }
 

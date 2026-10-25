@@ -1,14 +1,23 @@
 #include "hbf_eventlab/host/host_driver.hpp"
 #include <algorithm>
 namespace hbf_eventlab {
-HostDriver::HostDriver(IHostPort& p,EventQueue& e,const IHostInterleaver& i,HostConfiguration c,std::unique_ptr<IHostSendPolicy> policy)
+HostDriver::HostDriver(IHostPort& p,EventQueue& e,const IHostInterleaver& i,HostConfiguration c,
+                       std::unique_ptr<IHostSendPolicy> policy,std::shared_ptr<IGlobalRequestGate> gate)
     :port_(p),events_(e),splitter_(i,p.layout()),config_(c),policy_(std::move(policy)),
+     gate_(std::move(gate)),
      retention_(c.retained_fragments),recovery_(c.max_replay_passes),channels_(p.description().geometry().host_channels) {
     if(&p.notifications().events()!=&e || !policy_ || !c.max_open_dlus_per_channel || !c.max_logical_fragments ||
        (c.max_pending_retries && !c.pending_retry_delay.value))
         throw std::invalid_argument("invalid Host configuration/clock");
     if(c.writes==WriteCommandMode::Burst4096&&!p.description().capabilities().write_burst)
         throw std::invalid_argument("4KiB write burst unsupported by profile");
+}
+std::vector<GlobalRequestId> HostDriver::unissued_parents(const Unit& u) const {
+    std::set<GlobalRequestId> unique;std::vector<GlobalRequestId> parents;
+    if(u.replay)return parents;
+    for(const auto& fragment:u.fragments)
+        if(!issued_globals_.count(fragment.parent)&&unique.insert(fragment.parent).second)parents.push_back(fragment.parent);
+    return parents;
 }
 HostDriver::~HostDriver() {
     *alive_=false;
@@ -115,6 +124,40 @@ void HostDriver::start() {
     });
     for(ChannelId ch=0;ch<channels_.size();++ch)request_pump(ch);
 }
+void HostDriver::enqueue(const GlobalRequest& input) {
+    if(!started_||gate_)throw std::logic_error("streaming Host must be started without a source gate");
+    if(requests_.count(input.id))throw std::invalid_argument("duplicate streaming Global ID");
+    if(!input.after.empty())throw std::invalid_argument("streaming producer must resolve dependencies before enqueue");
+    if(input.not_before!=events_.now())throw std::invalid_argument("streaming request must be ready at the current Tick");
+    validate({input});
+    if(checked_add(next_work_,input.bytes/64)>config_.max_logical_fragments)
+        throw std::invalid_argument("streaming workload exceeds fragment limit");
+    auto fragments=splitter_.split(input);
+    requests_.emplace(input.id,input);
+    results_.emplace(input.id,WorkResult{input.id,LogicalResult::Pending,fragments.size(),0,{}});
+    std::map<PageKey,std::vector<Fragment>> bursts;
+    std::map<ChannelId,SendUnitId> tails;
+    for(auto f:fragments) {
+        f.id=LogicalWorkId{++next_work_};work_.emplace(f.id,Work{f});
+        std::optional<ContentKey> key;
+        if(input.op==Op::Write) {
+            key=ContentKey{f.logical.block,input.content};
+            if(!versions_.count(*key)) {versions_.emplace(*key,Version{});version_order_[key->block].push_back(*key);}
+        }
+        if(key&&config_.writes==WriteCommandMode::Burst4096)bursts[{*key,f.logical.page}].push_back(f);
+        else tails[f.address.channel]=add_unit(input.op,{f},key,{});
+    }
+    for(auto& item:bursts)add_unit(Op::Write,std::move(item.second),item.first.content,{});
+    if(input.op==Op::Read&&config_.hints==ReadHintMode::TailBatch)
+        for(const auto& tail:tails)units_.at(tail.second).hint=ReadHint::Batch;
+    // A producer can submit a later page of a content version that already
+    // failed. Give it a final result instead of leaving it ineligible forever.
+    for(auto& item:units_)if(item.second.stage==UnitStage::Queued&&item.second.content) {
+        const auto& version=versions_.at(*item.second.content);
+        if(version.aborted)cancel_unit(item.second,version.reason);
+    }
+    for(ChannelId ch=0;ch<channels_.size();++ch)request_pump(ch);
+}
 void HostDriver::request_pump(ChannelId ch) {
     if(channels_[ch].pump)return;
     channels_[ch].pump=schedule(events_.now(),[this,ch]{channels_[ch].pump.reset();pump(ch);});
@@ -135,6 +178,10 @@ bool HostDriver::eligible(const Unit& u) const {
     if(!u.replay)for(const auto& fragment:u.fragments) {
         const auto& request=requests_.at(fragment.parent);
         if(events_.now()<request.not_before||!dependencies_ready(fragment.parent))return false;
+    }
+    if(gate_) {
+        const auto parents=unissued_parents(u);
+        if(!parents.empty()&&!gate_->can_issue(parents))return false;
     }
     if(u.op==Op::Read) {
         for(const auto& item:units_) {
@@ -205,6 +252,11 @@ void HostDriver::pump(ChannelId ch) {
             continue;
         }
         if(!handoff.attempt)throw std::logic_error("Taken without attempt identity");
+        if(gate_&&!u.replay) {
+            const auto parents=unissued_parents(u);
+            for(auto parent:parents)issued_globals_.insert(parent);
+            if(!parents.empty())gate_->issued(parents,events_.now());
+        }
         u.capacity_at_handoff=capacity_progress_[ch];u.order_retry_allowed=false;
         if(u.retry==RetryKind::PendingLimit) {++u.pending_retries;++stats_.pending_retry_commands;}
         else if(u.retry==RetryKind::Timeout && u.handoffs)++stats_.timeout_retry_commands;
@@ -245,7 +297,14 @@ void HostDriver::finish_work(LogicalWorkId id,bool success,const std::string& re
     --result.remaining;
     if(success)++stats_.logical_success;
     else {++stats_.logical_failed;++result.failed;if(result.reason.empty())result.reason=reason;}
-    if(!result.remaining)result.state=result.failed?LogicalResult::Failed:LogicalResult::Success;
+    if(!result.remaining) {
+        result.state=result.failed?LogicalResult::Failed:LogicalResult::Success;
+        if(gate_)gate_->completed(result,events_.now());
+        if(completion_) {
+            const auto saved=result;const auto at=events_.now();
+            schedule(at,[this,saved,at]{if(completion_)completion_(saved,at);});
+        }
+    }
 }
 void HostDriver::cancel_unit(Unit& u,const std::string& reason) {
     if(u.stage!=UnitStage::Queued)return;
@@ -429,6 +488,10 @@ std::string HostDriver::waiting_reason() const {
         const auto& t=item.second;
         if(t.phase==RecoveryPhase::Draining&&!t.through)return "WaitingForProgramFailRoot";
         if(t.phase==RecoveryPhase::Draining&&!t.drain.empty())return "WaitingForOldAttemptResponses";
+    }
+    if(gate_)for(const auto& item:units_)if(item.second.stage==UnitStage::Queued) {
+        const auto parents=unissued_parents(item.second);
+        if(!parents.empty()&&!gate_->can_issue(parents))return "GlobalRequestGateBlocked";
     }
     return "PendingDependenciesOrSendEligibility";
 }

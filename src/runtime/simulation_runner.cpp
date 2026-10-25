@@ -8,7 +8,7 @@ const char* to_string(RunStatus s) {
     }
 }
 RunReport SimulationRunner::report(RunStatus s,const std::string& why) {
-    return {s,host_.workload_success(),events_.now(),events_.executed(),host_.activity(),device_(),why};
+    return {s,host_.workload_success()&&(!source_success_||source_success_()),events_.now(),events_.executed(),host_.activity(),device_(),why};
 }
 RunReport SimulationRunner::run(RunLimits limits) {
     events_.set_limits(limits.events);
@@ -16,9 +16,9 @@ RunReport SimulationRunner::run(RunLimits limits) {
         for(;;) {
             const auto next=events_.next_time(); // excludes canceled heap tombstones
             if(!next) {
-                if(host_.activity().drained()&&device_().drained())
-                    return report(RunStatus::Completed,host_.workload_success()?"All logical work succeeded":"Logical failures recorded; transient work drained");
-                return report(RunStatus::Stalled,host_.waiting_reason()+"; unfinished work with no live progress event");
+                if(host_.activity().drained()&&device_().drained()&&(!source_drained_||source_drained_()))
+                    return report(RunStatus::Completed,host_.workload_success()&&(!source_success_||source_success_())?"All logical work succeeded":"Logical failures recorded; transient work drained");
+                return report(RunStatus::Stalled,(source_reason_?source_reason_()+"; ":"")+host_.waiting_reason()+"; unfinished work with no live progress event");
             }
             if(limits.max_tick && *limits.max_tick<*next)return report(RunStatus::LimitReached,"Next event exceeds simulated-time limit; state retained");
             // Future timeout/window/operation completions are real progress events.

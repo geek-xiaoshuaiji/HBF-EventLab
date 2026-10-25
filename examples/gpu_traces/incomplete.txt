@@ -1,0 +1,2 @@
+HBF_EVENTLAB_GPU_TRACE 1
+WRITE 1 0 0 64 content=1 source=0

@@ -1,0 +1,9 @@
+HBF_EVENTLAB_GPU_TRACE 1
+# Run this baseline with --channels 1. The writes program local pages 0 and 1.
+WRITE 1 0 0 4096 content=1 source=0
+WRITE 2 0 4096 4096 content=1 source=1
+# Four cache-line reads become eligible after both writes and share GPU page 0.
+READ 3 100 0 64 after=1,2 expect=1 source=0
+READ 4 100 64 64 after=1,2 expect=1 source=1
+READ 5 101 128 64 after=1,2 expect=1 source=2
+READ 6 101 192 64 after=1,2 expect=1 source=3

@@ -78,5 +78,19 @@ bool EventQueue::run_next() {
     return true;
 }
 void EventQueue::run() { while (run_next()) {} }
+void EventQueue::run_until(Tick horizon) {
+    if (executing_ || settling_) throw std::logic_error("event runner is not reentrant");
+    if (horizon < now_) throw std::invalid_argument("external clock moved backwards");
+    while (true) {
+        const auto next = next_time();
+        if (!next || horizon < *next) break;
+        run_next();
+    }
+    if (now_ < horizon) {
+        now_ = horizon;
+        round_ = tick_events_ = 0;
+        has_executed_ = false;
+    }
+}
 } // namespace hbf_eventlab
 

@@ -1,0 +1,35 @@
+HBF_EVENTLAB_GPU_TRACE 1
+# One full-page initialization, then 32 same-page GPU cache-line reads.
+WRITE 1 0 0 4096 content=1 source=0
+READ 2 1 0 64 after=1 expect=1 source=0
+READ 3 1 64 64 after=1 expect=1 source=1
+READ 4 1 128 64 after=1 expect=1 source=2
+READ 5 1 192 64 after=1 expect=1 source=3
+READ 6 1 256 64 after=1 expect=1 source=0
+READ 7 1 320 64 after=1 expect=1 source=1
+READ 8 1 384 64 after=1 expect=1 source=2
+READ 9 1 448 64 after=1 expect=1 source=3
+READ 10 1 512 64 after=1 expect=1 source=0
+READ 11 1 576 64 after=1 expect=1 source=1
+READ 12 1 640 64 after=1 expect=1 source=2
+READ 13 1 704 64 after=1 expect=1 source=3
+READ 14 1 768 64 after=1 expect=1 source=0
+READ 15 1 832 64 after=1 expect=1 source=1
+READ 16 1 896 64 after=1 expect=1 source=2
+READ 17 1 960 64 after=1 expect=1 source=3
+READ 18 1 1024 64 after=1 expect=1 source=0
+READ 19 1 1088 64 after=1 expect=1 source=1
+READ 20 1 1152 64 after=1 expect=1 source=2
+READ 21 1 1216 64 after=1 expect=1 source=3
+READ 22 1 1280 64 after=1 expect=1 source=0
+READ 23 1 1344 64 after=1 expect=1 source=1
+READ 24 1 1408 64 after=1 expect=1 source=2
+READ 25 1 1472 64 after=1 expect=1 source=3
+READ 26 1 1536 64 after=1 expect=1 source=0
+READ 27 1 1600 64 after=1 expect=1 source=1
+READ 28 1 1664 64 after=1 expect=1 source=2
+READ 29 1 1728 64 after=1 expect=1 source=3
+READ 30 1 1792 64 after=1 expect=1 source=0
+READ 31 1 1856 64 after=1 expect=1 source=1
+READ 32 1 1920 64 after=1 expect=1 source=2
+READ 33 1 1984 64 after=1 expect=1 source=3

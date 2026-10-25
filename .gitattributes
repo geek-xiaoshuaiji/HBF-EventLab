@@ -4,3 +4,6 @@
 # Windows 批处理脚本使用 CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Stored upstream integration patches preserve Makefile tabs and source context.
+*.patch text eol=lf -whitespace

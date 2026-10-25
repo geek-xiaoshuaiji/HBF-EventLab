@@ -76,4 +76,4 @@ Bank全程互斥、组头取数、每遍排空和逐页replay是保守基线。D
 
 固定NAND/Cache时延、控制服务字节、传播延迟、缓冲深度、演示几何和Host容量是模型参数。UCIe有效吞吐档位有规范来源，但不构成整条路径的硬件校准。Tick、命令计数、CTest墙钟耗时和C++容器内存分别属于不同指标，不能直接推导真实吞吐、功耗或面积。
 
-Host加载有限输入并保留工作历史，部分检查扫描候选和依赖；尚未针对百万命令优化。没有GPU/HBM前端或完整GPU–HBM–HBF执行路径。Linux及其他编译器的验证状态以[验证说明](verification.md#evidence)为准。
+Host加载有限输入并保留工作历史，部分检查扫描候选和依赖；尚未针对百万命令优化。GPU分支已提供Accel-Sim/GPGPU-Sim Core到EventLab Device的在线`mem_fetch`请求/完成闭环，包括32B sector、128B mask、MSHR fan-out、严格整页写和Host replay反馈。GPGPU-Sim仍负责功能数据值，EventLab使用符号内容；当前扁平通道不超过16，采用有限稀疏驻留和简化的一Die/一Bank、一页erase-block profile，不包含原版分Stack FTL、logic-die cache、wear leveling、atomics错误返回或完整HBM/HBF一致性层。见[引入记录](hbf_sim_import.md)。Linux及其他编译器的验证状态以[验证说明](verification.md#evidence)为准。
