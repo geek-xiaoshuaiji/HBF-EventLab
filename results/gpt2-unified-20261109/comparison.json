@@ -1,0 +1,47 @@
+{
+  "ttft_ms": {
+    "old": 72.99253617021276,
+    "new": 72.99253617021276,
+    "delta": 0.0
+  },
+  "tpot_ms": {
+    "old": 48.000169030732856,
+    "new": 48.000169030732856,
+    "delta": 0.0
+  },
+  "total_gpu_cycles": {
+    "old": 305960191,
+    "new": 305960191,
+    "delta": 0
+  },
+  "kernel_count": {
+    "old": 1480,
+    "new": 1480,
+    "delta": 0
+  },
+  "per_token_end_cycle": [
+    {
+      "old": 102919476,
+      "new": 102919476,
+      "delta": 0
+    },
+    {
+      "old": 170216747,
+      "new": 170216747,
+      "delta": 0
+    },
+    {
+      "old": 238225156,
+      "new": 238225156,
+      "delta": 0
+    },
+    {
+      "old": 305960191,
+      "new": 305960191,
+      "delta": 0
+    }
+  ],
+  "same_token_ids": true,
+  "exact_timing_match": true,
+  "source_commit": "d32959113553ed9b38eb02bb10f3b85cb01f74e5"
+}

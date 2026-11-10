@@ -1,0 +1,17 @@
+source.zip: OK
+source/hbf_eventlab_bridge.cc: OK
+gpu-headers/hbf_eventlab/gpu/configured_backend.hpp: OK
+config/gpt2-eventlab-device.ini: OK
+source/run_unified_replay.sh: OK
+/home/server/hbf-experiments/20261109-gpt2-unified/simulator/gpu-simulator/bin/release/accel-sim.out: OK
+/home/server/hbf-experiments/20261109-gpt2-unified/build-gpu/backend/libhbf_eventlab.a: OK
+No $GPGPUSIM_ROOT, testing for local folder in: "/home/server/hbf-experiments/20261109-gpt2-unified/simulator/gpu-simulator/gpgpu-sim"
+Found /home/server/hbf-experiments/20261109-gpt2-unified/simulator/gpu-simulator/gpgpu-sim, using existing local location. Not sycning anything.
+warning: CRLF will be replaced by LF in .gitignore.
+The file will have its original line endings in your working directory
+warning: CRLF will be replaced by LF in README.md.
+The file will have its original line endings in your working directory
+GPGPU-Sim version 4.2.0 (build gpgpu-sim_git-commit-6c3cf4f-modified_615.0) configured with AccelWattch.
+setup_environment succeeded
+Using GPGPU-Sim in /home/server/hbf-experiments/20261109-gpt2-unified/simulator/gpu-simulator/gpgpu-sim
+Accel-Sim setup succeeded.

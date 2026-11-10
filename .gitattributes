@@ -8,3 +8,7 @@
 *.cu text eol=lf
 results/gpt2-20261107/* -text
 results/gpt2-20261107/README.md text eol=lf
+results/gpt2-unified-20261109/* -text
+results/gpt2-unified-20261109/README.md text eol=lf
+results/gpt2-unified-20261109/backend-input.ini -diff
+results/gpt2-unified-20261109/per-token.csv -diff

@@ -10,6 +10,10 @@ Latest changes, local smoke results, limitations, and Linux handoff:
 Rebuild the Linux GPU simulator and pass a short replay before the full run.
 The existing GPT-2 result below was produced before this configuration change.
 
+The complete unified-configuration rerun now passes all 1,480 kernels and strict
+request lifecycle checks. Simulated TTFT and TPOT match the prior result exactly.
+See [the unified-configuration result and run scripts](results/gpt2-unified-20261109/README.md).
+
 ---
 
 # GPT-2 124M + simulated GPU + incremental HBF source snapshot
